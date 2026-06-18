@@ -120,6 +120,20 @@
     <div id="dbg" style="font-size:.7rem;color:#5a6a7a;margin-top:8px;font-family:monospace"></div>
   </div>
 
+  <!-- 重點摘要 -->
+  <div class="card">
+    <h2>✦ 重點摘要（AI 整理）</h2>
+    <div class="row" style="margin-bottom:12px">
+      <select id="sumModel" style="background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:inherit">
+        <option value="gemini-flash-latest">Flash（快速）</option>
+        <option value="gemini-pro-latest">Pro（深入）</option>
+      </select>
+      <button class="btn-ghost" id="sumBtn">✦ 摘要重點</button>
+      <button class="btn-ghost" id="sumCopy">複製</button>
+    </div>
+    <div id="sumOut" style="white-space:pre-wrap;line-height:1.75;font-size:1rem;color:var(--text);min-height:40px">（錄製後按「摘要重點」，AI 會整理出主題、結論、待辦）</div>
+  </div>
+
   <div class="footer">
     每個人使用自己的 API key · key 僅存於本機瀏覽器 · 不經過任何伺服器<br>
     模型：gemini-3.5-live-translate-preview · 自動偵測來源語言

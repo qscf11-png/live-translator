@@ -156,6 +156,56 @@ $("dlBtn").onclick = () => {
   setStatus(`✅ 已下載對照稿（${n} 句）`, "ok");
 };
 
+// ───────── 重點摘要（Gemini 文字模型） ─────────
+$("sumBtn").onclick = async () => {
+  const key = (localStorage.getItem("gemini_key") || "").trim();
+  if (!key) { setStatus("⚠ 請先設定 Gemini API key", "err"); return; }
+  // 收集逐句原文（最忠實）；不足時退而用翻譯
+  const lines = recSrc.map(r => r.text);
+  if (srcAccum.trim()) lines.push(srcAccum.trim());
+  let transcript = lines.join("\n");
+  if (!transcript.trim()) {
+    const anyLang = targets.find(l => (recOut[l] || []).length);
+    if (anyLang) transcript = recOut[anyLang].join("\n");
+  }
+  if (!transcript.trim()) { $("sumOut").textContent = "（尚無內容可摘要）"; return; }
+
+  const model = $("sumModel").value;
+  $("sumBtn").disabled = true;
+  $("sumOut").textContent = `摘要中…（${model}）`;
+  try {
+    const ai = new GoogleGenAI({ apiKey: key });
+    const prompt =
+`以下是一段會議／對話的逐句語音記錄。請用繁體中文（台灣用語）整理重點，格式：
+
+## 主題
+（一兩句總結這段在談什麼）
+
+## 重點
+- （條列關鍵內容，3-7 點）
+
+## 決定／結論
+- （若有明確決定或結論；沒有就寫「無明確結論」）
+
+## 待辦／後續行動
+- （若有 action item，註明負責人若提到；沒有就寫「無」）
+
+逐句記錄：
+${transcript}`;
+    const resp = await ai.models.generateContent({ model, contents: prompt });
+    $("sumOut").textContent = (resp.text || "（模型無回應）").trim();
+    setStatus("✅ 摘要完成", "ok");
+  } catch (e) {
+    $("sumOut").textContent = "❌ 摘要失敗：" + (e.message || e);
+    setStatus("摘要失敗", "err");
+  }
+  $("sumBtn").disabled = false;
+};
+$("sumCopy").onclick = () => {
+  const t = $("sumOut").textContent;
+  if (t) { navigator.clipboard.writeText(t); setStatus("已複製摘要", "ok"); }
+};
+
 // ───────── 音訊：Float32 → 16k Int16 → base64 ─────────
 function downsample(f32, inRate) {
   if (inRate === TARGET_RATE) return f32;
