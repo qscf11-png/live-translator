@@ -7,6 +7,7 @@ const MODEL = "gemini-3.5-live-translate-preview";
 const TARGET_RATE = 16000;
 const SENT_END = /[。！？.!?…]/;
 const SHORT = { "zh-Hant": "繁", "zh-Hans": "简", "en": "EN", "ja": "日", "ko": "韓" };
+const NAME = { "zh-Hant": "繁體中文", "zh-Hans": "简体中文", "en": "English", "ja": "日本語", "ko": "한국어" };
 const PALETTE = ["c0", "c1", "c2", "c3", "c4"];
 const IDLE_FLUSH = 2500; // ms
 
@@ -19,7 +20,11 @@ let audioCtx = null, stream = null, srcNode = null, procNode = null;
 const pending = {};     // lang -> 未完成句緩衝
 const lastTs = {};      // lang -> 最後片段時間
 let colorI = 0;
-let srcBuf = "";
+let srcDisplay = "";    // 底部即時行顯示用
+// ── 對照稿錄製 ──
+let recSrc = [];        // 原文句子（依序）
+let recOut = {};        // lang -> 翻譯句子陣列（依序）
+let srcAccum = "";      // 原文斷句累積
 
 // ───────── DOM ─────────
 const $ = (id) => document.getElementById(id);
@@ -68,6 +73,7 @@ function updateHint() {
 function commit(lang, sentence) {
   sentence = sentence.trim();
   if (!sentence) return;
+  (recOut[lang] = recOut[lang] || []).push(sentence);  // 錄入對照稿
   const atBottom = capEl.scrollHeight - capEl.scrollTop - capEl.clientHeight < 40;
   const div = document.createElement("div");
   div.className = "line " + PALETTE[colorI % PALETTE.length];
@@ -81,15 +87,19 @@ function commit(lang, sentence) {
   colorI++;
   if (atBottom) capEl.scrollTop = capEl.scrollHeight;
 }
-function feed(lang, text) {
-  pending[lang] = (pending[lang] || "") + text;
-  lastTs[lang] = Date.now();
-  let buf = pending[lang], out = [], start = 0;
+function splitSentences(buf) {
+  let out = [], start = 0;
   for (let i = 0; i < buf.length; i++) {
     if (SENT_END.test(buf[i])) { out.push(buf.slice(start, i + 1)); start = i + 1; }
   }
-  out.forEach(s => commit(lang, s));
-  pending[lang] = buf.slice(start);
+  return { sents: out, rest: buf.slice(start) };
+}
+function feed(lang, text) {
+  pending[lang] = (pending[lang] || "") + text;
+  lastTs[lang] = Date.now();
+  const { sents, rest } = splitSentences(pending[lang]);
+  sents.forEach(s => commit(lang, s));
+  pending[lang] = rest;
 }
 setInterval(() => {
   const now = Date.now();
@@ -105,6 +115,36 @@ setInterval(() => {
   }
 }, 300);
 $("clearBtn").onclick = () => { capEl.innerHTML = ""; liveEl.textContent = ""; };
+
+// ───────── 下載對照稿（原文 ↔ 翻譯，逐句） ─────────
+function pad(n) { return String(n).padStart(2, "0"); }
+$("dlBtn").onclick = () => {
+  // 收尾：把還沒斷句的尾段也納入
+  if (srcAccum.trim()) { recSrc.push(srcAccum.trim()); srcAccum = ""; }
+  for (const lang of targets) {
+    if (pending[lang] && pending[lang].trim()) {
+      (recOut[lang] = recOut[lang] || []).push(pending[lang].trim()); pending[lang] = "";
+    }
+  }
+  const langs = targets.slice();
+  const n = Math.max(recSrc.length, ...langs.map(l => (recOut[l] || []).length), 0);
+  if (n === 0) { setStatus("⚠ 尚無內容可下載", "err"); return; }
+
+  const esc = s => '"' + String(s || "").replace(/"/g, '""') + '"';
+  const header = ["#", "原文（聽到）", ...langs.map(l => NAME[l] || l)];
+  const rows = [header];
+  for (let i = 0; i < n; i++) {
+    rows.push([i + 1, recSrc[i] || "", ...langs.map(l => (recOut[l] || [])[i] || "")]);
+  }
+  const csv = "﻿" + rows.map(r => r.map(esc).join(",")).join("\r\n");  // BOM 讓 Excel 正確顯示中文
+  const d = new Date();
+  const ts = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `翻譯對照_${ts}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  setStatus(`✅ 已下載對照稿（${n} 句）`, "ok");
+};
 
 // ───────── 音訊：Float32 → 16k Int16 → base64 ─────────
 function downsample(f32, inRate) {
@@ -133,6 +173,10 @@ async function start() {
   const key = (localStorage.getItem("gemini_key") || "").trim();
   if (!key) { setStatus("⚠ 請先在設定輸入你的 Gemini API key", "err"); return; }
   if (!targets.length) { setStatus("⚠ 請至少勾選一個翻譯語言", "err"); return; }
+
+  // 新一輪 → 重置對照稿錄製
+  recSrc = []; recOut = {}; srcAccum = ""; srcDisplay = "";
+  dbg.msg = dbg.in = dbg.out = dbg.turn = 0;
 
   try {
     setStatus("正在取得音訊…");
@@ -172,8 +216,13 @@ async function start() {
             if (sc.inputTranscription?.text) {
               dbg.in++;
               if (isPrimary) {
-                srcBuf = (srcBuf + sc.inputTranscription.text).slice(-160);
-                liveEl.textContent = "🔊 " + srcBuf;
+                const t = sc.inputTranscription.text;
+                srcDisplay = (srcDisplay + t).slice(-160);
+                liveEl.textContent = "🔊 " + srcDisplay;
+                srcAccum += t;
+                const { sents, rest } = splitSentences(srcAccum);
+                sents.forEach(s => { const x = s.trim(); if (x) recSrc.push(x); });
+                srcAccum = rest;
               }
             }
             if (sc.outputTranscription?.text) { dbg.out++; feed(lang, sc.outputTranscription.text); }
