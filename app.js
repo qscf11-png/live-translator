@@ -22,9 +22,11 @@ const lastTs = {};      // lang -> 最後片段時間
 let colorI = 0;
 let srcDisplay = "";    // 底部即時行顯示用
 // ── 對照稿錄製 ──
-let recSrc = [];        // 原文句子（依序）
+let recSrc = [];        // 原文句子 [{ms, text}]（依序）
 let recOut = {};        // lang -> 翻譯句子陣列（依序）
 let srcAccum = "";      // 原文斷句累積
+let recStartMs = 0;     // 開始錄製的時間基準
+let srcSentStart = null;// 目前原文句的起始時間
 
 // ───────── DOM ─────────
 const $ = (id) => document.getElementById(id);
@@ -118,9 +120,16 @@ $("clearBtn").onclick = () => { capEl.innerHTML = ""; liveEl.textContent = ""; }
 
 // ───────── 下載對照稿（原文 ↔ 翻譯，逐句） ─────────
 function pad(n) { return String(n).padStart(2, "0"); }
+function fmtTime(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+}
 $("dlBtn").onclick = () => {
   // 收尾：把還沒斷句的尾段也納入
-  if (srcAccum.trim()) { recSrc.push(srcAccum.trim()); srcAccum = ""; }
+  if (srcAccum.trim()) {
+    recSrc.push({ ms: (srcSentStart || Date.now()) - recStartMs, text: srcAccum.trim() });
+    srcAccum = "";
+  }
   for (const lang of targets) {
     if (pending[lang] && pending[lang].trim()) {
       (recOut[lang] = recOut[lang] || []).push(pending[lang].trim()); pending[lang] = "";
@@ -131,10 +140,11 @@ $("dlBtn").onclick = () => {
   if (n === 0) { setStatus("⚠ 尚無內容可下載", "err"); return; }
 
   const esc = s => '"' + String(s || "").replace(/"/g, '""') + '"';
-  const header = ["#", "原文（聽到）", ...langs.map(l => NAME[l] || l)];
+  const header = ["#", "時間", "發言人", "原文（聽到）", ...langs.map(l => NAME[l] || l)];
   const rows = [header];
   for (let i = 0; i < n; i++) {
-    rows.push([i + 1, recSrc[i] || "", ...langs.map(l => (recOut[l] || [])[i] || "")]);
+    const r = recSrc[i] || {};
+    rows.push([i + 1, fmtTime(r.ms || 0), "", r.text || "", ...langs.map(l => (recOut[l] || [])[i] || "")]);
   }
   const csv = "﻿" + rows.map(r => r.map(esc).join(",")).join("\r\n");  // BOM 讓 Excel 正確顯示中文
   const d = new Date();
@@ -176,6 +186,7 @@ async function start() {
 
   // 新一輪 → 重置對照稿錄製
   recSrc = []; recOut = {}; srcAccum = ""; srcDisplay = "";
+  recStartMs = Date.now(); srcSentStart = null;
   dbg.msg = dbg.in = dbg.out = dbg.turn = 0;
 
   try {
@@ -217,11 +228,16 @@ async function start() {
               dbg.in++;
               if (isPrimary) {
                 const t = sc.inputTranscription.text;
+                if (srcAccum === "") srcSentStart = Date.now();  // 記下這句開始時間
                 srcDisplay = (srcDisplay + t).slice(-160);
                 liveEl.textContent = "🔊 " + srcDisplay;
                 srcAccum += t;
                 const { sents, rest } = splitSentences(srcAccum);
-                sents.forEach(s => { const x = s.trim(); if (x) recSrc.push(x); });
+                if (sents.length) {
+                  const ms = (srcSentStart || Date.now()) - recStartMs;
+                  sents.forEach(s => { const x = s.trim(); if (x) recSrc.push({ ms, text: x }); });
+                  srcSentStart = null;
+                }
                 srcAccum = rest;
               }
             }
