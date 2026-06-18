@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>即時翻譯字幕 · Live Translator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14; --panel:rgba(255,255,255,0.05); --border:rgba(255,255,255,0.1);
+    --teal:#00c39a; --teal2:#00e0b0; --muted:#7a8794; --text:#e6edf3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter','Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);
+    min-height:100vh;
+    background-image:radial-gradient(900px 500px at 80% -10%,rgba(0,195,154,0.18),transparent),
+                     radial-gradient(700px 500px at 0% 110%,rgba(60,120,255,0.12),transparent);
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:24px 18px 40px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  header h1{font-size:1.5rem;font-weight:800;letter-spacing:-.5px}
+  header .dot{width:10px;height:10px;border-radius:50%;background:#555;box-shadow:0 0 0 0 rgba(0,195,154,.6)}
+  header .dot.on{background:var(--teal);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,195,154,.5)}70%{box-shadow:0 0 0 10px rgba(0,195,154,0)}100%{box-shadow:0 0 0 0 rgba(0,195,154,0)}}
+  .card{background:var(--panel);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+        border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:16px}
+  .card h2{font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;font-weight:600}
+  label{display:block;font-size:.9rem;margin-bottom:6px;color:var(--muted)}
+  input[type=password],input[type=text]{
+    width:100%;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;
+    color:var(--text);padding:11px 13px;font-size:.95rem;font-family:inherit}
+  input:focus{outline:none;border-color:var(--teal)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .seg{display:flex;gap:8px;flex-wrap:wrap}
+  .seg button,.chip{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);
+    padding:10px 16px;border-radius:12px;cursor:pointer;font-family:inherit;font-size:.95rem;transition:.15s}
+  .seg button.active{background:var(--teal);color:#04140f;border-color:var(--teal);font-weight:700}
+  .chip{user-select:none}
+  .chip.on{background:rgba(0,195,154,.18);border-color:var(--teal);color:var(--teal2);font-weight:700}
+  .btn-primary{background:linear-gradient(135deg,var(--teal),var(--teal2));color:#04140f;border:none;
+    padding:14px 28px;border-radius:14px;font-size:1.05rem;font-weight:800;cursor:pointer;font-family:inherit;
+    box-shadow:0 6px 20px rgba(0,195,154,.3);transition:.15s}
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-primary.stop{background:linear-gradient(135deg,#e5484d,#ff6b6b);box-shadow:0 6px 20px rgba(229,72,77,.3)}
+  .btn-ghost{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);
+    padding:9px 16px;border-radius:12px;cursor:pointer;font-family:inherit;font-size:.85rem}
+  .hint{font-size:.8rem;color:var(--muted);margin-top:8px;line-height:1.5}
+  #captions{min-height:230px;max-height:50vh;overflow-y:auto;line-height:1.7;font-size:1.25rem;font-weight:700;
+    font-family:'Noto Sans TC',sans-serif;padding:6px 2px}
+  #captions .line{margin-bottom:10px;animation:fade .25s ease}
+  #captions .tag{font-size:.7rem;font-weight:800;color:var(--teal);margin-right:8px;vertical-align:middle;
+    border:1px solid rgba(0,195,154,.4);border-radius:6px;padding:1px 6px}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  #live{font-size:.95rem;color:var(--muted);margin-top:12px;padding-top:12px;border-top:1px solid var(--border);min-height:24px;font-weight:400}
+  #status{font-size:.85rem;padding:8px 0;min-height:20px}
+  .err{color:#ff8b8b}.ok{color:var(--teal2)}
+  .masked{font-size:.8rem;color:var(--muted)}
+  .c0{color:#ffffff}.c1{color:#ffd479}.c2{color:#7dd3fc}.c3{color:#86efac}.c4{color:#f4a6c8}
+  details summary{cursor:pointer;color:var(--muted);font-size:.85rem}
+  .footer{font-size:.75rem;color:var(--muted);text-align:center;margin-top:20px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="dot" id="dot"></span>
+    <h1>即時翻譯字幕</h1>
+  </header>
+
+  <!-- 設定 -->
+  <div class="card">
+    <h2>⚙️ 設定 · 你的 Gemini API Key</h2>
+    <label>API Key（只存在你自己的瀏覽器，不會上傳、不在程式碼內）</label>
+    <div class="row">
+      <input type="password" id="apikey" placeholder="貼上你的 Gemini API key（AIza...）" style="flex:1;min-width:220px">
+      <button class="btn-ghost" id="saveKey">儲存</button>
+      <button class="btn-ghost" id="clearKey">清除</button>
+    </div>
+    <div class="hint" id="keyState">尚未設定 key。<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--teal2)">取得 Gemini API key →</a></div>
+  </div>
+
+  <!-- 模式 + 語言 -->
+  <div class="card">
+    <h2>🎚️ 模式與語言</h2>
+    <label>聲音來源</label>
+    <div class="seg" id="modeSeg" style="margin-bottom:16px">
+      <button data-mode="mic" class="active">🎤 我說話（麥克風）</button>
+      <button data-mode="display">🎧 聽對方（分享分頁/螢幕音訊）</button>
+    </div>
+    <label>翻譯成（可多選）</label>
+    <div class="seg" id="langSeg">
+      <span class="chip on" data-lang="zh-Hant">繁體中文</span>
+      <span class="chip" data-lang="zh-Hans">简体中文</span>
+      <span class="chip" data-lang="en">English</span>
+      <span class="chip" data-lang="ja">日本語</span>
+      <span class="chip" data-lang="ko">한국어</span>
+    </div>
+    <div class="hint" id="modeHint"></div>
+  </div>
+
+  <!-- 控制 -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <button class="btn-primary" id="startBtn">▶ 開始翻譯</button>
+      <button class="btn-ghost" id="clearBtn">清空字幕</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <!-- 字幕 -->
+  <div class="card">
+    <h2>📝 翻譯字幕</h2>
+    <div id="captions"></div>
+    <div id="live"></div>
+  </div>
+
+  <div class="footer">
+    每個人使用自己的 API key · key 僅存於本機瀏覽器 · 不經過任何伺服器<br>
+    模型：gemini-3.5-live-translate-preview · 自動偵測來源語言
+  </div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
