@@ -1,4 +1,6 @@
-import { GoogleGenAI } from "https://esm.sh/@google/genai@1.21.0";
+import { GoogleGenAI, Modality } from "https://esm.sh/@google/genai@1.21.0";
+
+const dbg = { in: 0, out: 0, turn: 0, msg: 0 };
 
 // ───────── 常數 ─────────
 const MODEL = "gemini-3.5-live-translate-preview";
@@ -96,6 +98,11 @@ setInterval(() => {
       commit(lang, pending[lang]); pending[lang] = "";
     }
   }
+  // 診斷計數（讓使用者不用開 F12 也看得到訊息流向）
+  if (running) {
+    const d = document.getElementById("dbg");
+    if (d) d.textContent = `診斷｜總訊息:${dbg.msg}　來源辨識:${dbg.in}　翻譯輸出:${dbg.out}　turn文字:${dbg.turn}`;
+  }
 }, 300);
 $("clearBtn").onclick = () => { capEl.innerHTML = ""; liveEl.textContent = ""; };
 
@@ -149,7 +156,7 @@ async function start() {
       const session = await ai.live.connect({
         model: MODEL,
         config: {
-          responseModalities: ["AUDIO"],
+          responseModalities: [Modality.AUDIO],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           translationConfig: { targetLanguageCode: lang, echoTargetLanguage: true },
@@ -159,11 +166,22 @@ async function start() {
           onmessage: (msg) => {
             const sc = msg.serverContent;
             if (!sc) return;
-            if (isPrimary && sc.inputTranscription?.text) {
-              srcBuf = (srcBuf + sc.inputTranscription.text).slice(-160);
-              liveEl.textContent = "🔊 " + srcBuf;
+            dbg.msg++;
+            if (sc.inputTranscription?.text) {
+              dbg.in++;
+              if (isPrimary) {
+                srcBuf = (srcBuf + sc.inputTranscription.text).slice(-160);
+                liveEl.textContent = "🔊 " + srcBuf;
+              }
             }
-            if (sc.outputTranscription?.text) feed(lang, sc.outputTranscription.text);
+            if (sc.outputTranscription?.text) { dbg.out++; feed(lang, sc.outputTranscription.text); }
+            // 備援：有些情況翻譯文字在 modelTurn 的 text part
+            if (sc.modelTurn?.parts) {
+              for (const p of sc.modelTurn.parts) {
+                if (p.text) { dbg.turn++; feed(lang, p.text); }
+              }
+            }
+            if (dbg.msg === 1) console.debug("首則訊息 serverContent keys:", Object.keys(sc));
           },
           onerror: (e) => setStatus("連線錯誤：" + (e.message || e), "err"),
           onclose: () => {},
