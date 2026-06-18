@@ -159,7 +159,9 @@ async function start() {
           responseModalities: [Modality.AUDIO],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
-          translationConfig: { targetLanguageCode: lang, echoTargetLanguage: true },
+          // 注意：SDK 對 translationConfig 不做 camelCase 轉換，整包直送 API，
+          // 故內部欄位必須用 API 的 snake_case 格式，否則目標語言會被忽略。
+          translationConfig: { target_language_code: lang, echo_target_language: true },
         },
         callbacks: {
           onopen: () => {},
