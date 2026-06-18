@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "https://esm.sh/@google/genai@1.21.0";
+import { GoogleGenAI, Modality } from "https://esm.sh/@google/genai@2.8.0";
 
 const dbg = { in: 0, out: 0, turn: 0, msg: 0 };
 
