@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>即時翻譯字幕 · Live Translator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     font-family:'Inter','Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);
-    min-height:100vh;
+    min-height:100vh;-webkit-text-size-adjust:100%;
     background-image:radial-gradient(900px 500px at 80% -10%,rgba(0,195,154,0.18),transparent),
                      radial-gradient(700px 500px at 0% 110%,rgba(60,120,255,0.12),transparent);
   }
@@ -60,6 +60,31 @@
   .c0{color:#ffffff}.c1{color:#ffd479}.c2{color:#7dd3fc}.c3{color:#86efac}.c4{color:#f4a6c8}
   details summary{cursor:pointer;color:var(--muted);font-size:.85rem}
   .footer{font-size:.75rem;color:var(--muted);text-align:center;margin-top:20px;line-height:1.6}
+
+  /* ───────── 手機適用版面 (RWD) ───────── */
+  @media (max-width:600px){
+    .wrap{padding:14px 12px 32px}
+    header{margin-bottom:14px}
+    header h1{font-size:1.25rem}
+    .card{padding:14px;border-radius:14px;margin-bottom:12px}
+    .card h2{font-size:.72rem;margin-bottom:10px}
+    /* iOS 點輸入/選單會自動放大 → 字級 ≥16px 可避免 */
+    input[type=password],input[type=text],select{font-size:16px}
+    /* 模式/語言鈕：加大好按、平分排列 */
+    .seg button,.chip{flex:1 1 40%;text-align:center;min-height:46px;padding:11px 10px;font-size:.95rem}
+    select{width:100%;min-height:46px}
+    /* 主按鈕整列、易點 */
+    .btn-primary{width:100%;padding:15px}
+    #startBtn{width:100%}
+    .btn-ghost{flex:1 1 auto;text-align:center;min-height:44px;font-size:.9rem;padding:11px 12px}
+    /* 控制列：下載/清空那組佔整列再平分 */
+    .row>div{flex:1 1 100%;display:flex;gap:8px}
+    .row>div>button{flex:1}
+    /* 字幕：手機字級略縮、區域加高 */
+    #captions{font-size:1.12rem;max-height:46vh;min-height:160px}
+    #sumOut{font-size:.95rem}
+    .footer{font-size:.7rem}
+  }
 </style>
 </head>
 <body>
