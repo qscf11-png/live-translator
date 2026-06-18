@@ -156,6 +156,49 @@ $("dlBtn").onclick = () => {
   setStatus(`✅ 已下載對照稿（${n} 句）`, "ok");
 };
 
+// ───────── 回放朗讀（瀏覽器語音合成 Web Speech API） ─────────
+const BCP = { "zh-Hant": "zh-TW", "zh-Hans": "zh-CN", "en": "en-US", "ja": "ja-JP", "ko": "ko-KR" };
+let pbVoices = [];
+function loadVoices() { pbVoices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+function guessLang(t) {
+  if (/[぀-ヿ]/.test(t)) return "ja-JP";   // 日文假名
+  if (/[가-힯]/.test(t)) return "ko-KR";   // 韓文
+  if (/[一-鿿]/.test(t)) return "zh-TW";   // 中日漢字（無假名→視為中文）
+  return "en-US";
+}
+function speakOne(text, lang) {
+  return new Promise(res => {
+    if (!text) return res();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    const v = pbVoices.find(v => v.lang === lang) || pbVoices.find(v => v.lang.startsWith(lang.slice(0, 2)));
+    if (v) u.voice = v;
+    u.onend = res; u.onerror = res;
+    speechSynthesis.speak(u);
+  });
+}
+let playing = false;
+$("pbStop").onclick = () => { playing = false; if (window.speechSynthesis) speechSynthesis.cancel(); setStatus("已停止回放"); };
+$("pbPlay").onclick = async () => {
+  if (!window.speechSynthesis) { setStatus("⚠ 此瀏覽器不支援語音合成", "err"); return; }
+  const mode = $("pbMode").value;
+  const tgt = targets[0];
+  const n = Math.max(recSrc.length, (recOut[tgt] || []).length);
+  if (!n) { setStatus("⚠ 尚無內容可回放", "err"); return; }
+  speechSynthesis.cancel(); playing = true; loadVoices();
+  setStatus("▶ 回放中…", "ok");
+  for (let i = 0; i < n && playing; i++) {
+    const src = (recSrc[i] || {}).text || "";
+    const tr = (recOut[tgt] || [])[i] || "";
+    if (mode === "src" || mode === "both") await speakOne(src, guessLang(src));
+    if (!playing) break;
+    if (mode === "tgt" || mode === "both") await speakOne(tr, BCP[tgt] || "en-US");
+  }
+  if (playing) setStatus("✅ 回放完畢", "ok");
+  playing = false;
+};
+
 // ───────── 重點摘要（Gemini 文字模型） ─────────
 $("sumBtn").onclick = async () => {
   const key = (localStorage.getItem("gemini_key") || "").trim();

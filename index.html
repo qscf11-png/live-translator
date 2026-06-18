@@ -120,6 +120,21 @@
     <div id="dbg" style="font-size:.7rem;color:#5a6a7a;margin-top:8px;font-family:monospace"></div>
   </div>
 
+  <!-- 回放朗讀 -->
+  <div class="card">
+    <h2>🔊 回放（虛擬人聲朗讀）</h2>
+    <div class="row" style="margin-bottom:6px">
+      <select id="pbMode" style="background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:inherit">
+        <option value="both">原文 + 譯文（對照）</option>
+        <option value="src">只朗讀原文</option>
+        <option value="tgt">只朗讀譯文</option>
+      </select>
+      <button class="btn-ghost" id="pbPlay">▶ 開始回放</button>
+      <button class="btn-ghost" id="pbStop">■ 停止</button>
+    </div>
+    <div class="hint">使用瀏覽器內建語音合成（免費、不需 key）。聲音品質依系統而定。</div>
+  </div>
+
   <!-- 重點摘要 -->
   <div class="card">
     <h2>✦ 重點摘要（AI 整理）</h2>
